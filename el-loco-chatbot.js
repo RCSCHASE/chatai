@@ -1,5 +1,5 @@
 // El Loco Chatbot - Locos Gringos Pick-N-Pull
-// Version 3.0 - Complete with Fixed Search
+// Version 3.1 - Fixed Vehicle Search Logic
 // Website: https://locosgringospicknpull.com
 
 (function() {
@@ -640,6 +640,96 @@
         }, 1000);
     }
 
+    function searchVehicles(searchQuery) {
+        if (!searchQuery || inventoryData.length === 0) return [];
+        
+        // Clean and normalize the search query
+        searchQuery = searchQuery.toLowerCase()
+            .replace(/do you have any|do you have|got any|any|looking for|need|want|\?/g, '')
+            .replace(/chevy/g, 'chevrolet')
+            .trim();
+        
+        // Extract key search terms
+        const searchTerms = searchQuery.split(/\s+/).filter(term => term.length > 0);
+        
+        // Create search patterns for common variations
+        const makeModelPatterns = {
+            'accord': ['honda', 'accord'],
+            'accords': ['honda', 'accord'],
+            'civic': ['honda', 'civic'],
+            'civics': ['honda', 'civic'],
+            'camry': ['toyota', 'camry'],
+            'camrys': ['toyota', 'camry'],
+            'corolla': ['toyota', 'corolla'],
+            'corollas': ['toyota', 'corolla'],
+            'f150': ['ford', 'f-150', 'f150'],
+            'f-150': ['ford', 'f-150', 'f150'],
+            'silverado': ['chevrolet', 'silverado'],
+            'silverados': ['chevrolet', 'silverado'],
+            'impala': ['chevrolet', 'impala'],
+            'impalas': ['chevrolet', 'impala'],
+            'tahoe': ['chevrolet', 'tahoe'],
+            'tahoes': ['chevrolet', 'tahoe'],
+            'suburban': ['chevrolet', 'suburban'],
+            'suburbans': ['chevrolet', 'suburban'],
+            'explorer': ['ford', 'explorer'],
+            'explorers': ['ford', 'explorer'],
+            'expedition': ['ford', 'expedition'],
+            'expeditions': ['ford', 'expedition'],
+            'ranger': ['ford', 'ranger'],
+            'rangers': ['ford', 'ranger'],
+            'altima': ['nissan', 'altima'],
+            'altimas': ['nissan', 'altima'],
+            'sentra': ['nissan', 'sentra'],
+            'sentras': ['nissan', 'sentra'],
+            'maxima': ['nissan', 'maxima'],
+            'maximas': ['nissan', 'maxima']
+        };
+        
+        // Check if search query matches a known model pattern
+        let enhancedSearchTerms = [...searchTerms];
+        for (const term of searchTerms) {
+            if (makeModelPatterns[term]) {
+                // Add the make to search terms if model is mentioned alone
+                enhancedSearchTerms = makeModelPatterns[term];
+                break;
+            }
+        }
+        
+        // Perform the search
+        let results = inventoryData.filter(vehicle => {
+            const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+            
+            // For known make/model patterns, check if vehicle matches
+            if (enhancedSearchTerms !== searchTerms) {
+                return enhancedSearchTerms.every(term => 
+                    vehicleString.includes(term) || 
+                    (term === 'f-150' && vehicleString.includes('f150')) ||
+                    (term === 'f150' && vehicleString.includes('f-150'))
+                );
+            }
+            
+            // Otherwise, check if all search terms are in the vehicle string
+            return enhancedSearchTerms.every(term => vehicleString.includes(term));
+        });
+        
+        // If no exact matches, try partial matches (but only if we have meaningful search terms)
+        if (results.length === 0 && searchTerms.length > 0) {
+            // Try searching for just the make or model
+            results = inventoryData.filter(vehicle => {
+                const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+                
+                // Count how many search terms match
+                const matchCount = searchTerms.filter(term => vehicleString.includes(term)).length;
+                
+                // Return vehicles that match at least half of the search terms (minimum 1)
+                return matchCount > 0 && matchCount >= Math.ceil(searchTerms.length / 2);
+            });
+        }
+        
+        return results;
+    }
+
     function processMessage(msg) {
         const lower = msg.toLowerCase();
         const t = TRANSLATIONS[currentLanguage];
@@ -664,79 +754,53 @@
                    `📞 ${t.callUs}: <a href="tel:${CONFIG.PHONE}" style="color:#4a8b6b;">${CONFIG.PHONE}</a>`;
         }
         
-        // Show all inventory
+        // Show all inventory (only if no specific vehicle mentioned)
         if ((lower.includes('inventory') || lower.includes('inventario')) && 
-            !lower.includes('chevy') && !lower.includes('chevrolet') && !lower.includes('ford') && !lower.includes('toyota')) {
+            !lower.match(/chevy|chevrolet|ford|toyota|honda|nissan|dodge|ram|gmc|buick|cadillac|chrysler|jeep|mazda|hyundai|kia|volkswagen|audi|bmw|mercedes/)) {
             if (inventoryData.length > 0) {
                 return `🚗 <strong>${inventoryData.length} ${t.vehiclesInYard}!</strong><br><br>` +
                        `${currentLanguage === 'es' ? 'Búsquedas populares' : 'Popular searches'}:<br>` +
-                       `• Ford F150<br>• Chevy Silverado<br>• Toyota Camry<br>• Honda Civic`;
+                       `• Ford F150<br>• Chevy Silverado<br>• Toyota Camry<br>• Honda Civic<br>• Honda Accord`;
             } else {
                 loadInventoryData();
                 return t.loading;
             }
         }
 
-        // FIXED VEHICLE SEARCH
+        // IMPROVED VEHICLE SEARCH
         if (inventoryData.length > 0) {
-            let results = [];
+            // Check if message might be a vehicle search
+            const vehicleKeywords = /accord|civic|camry|corolla|f150|f-150|silverado|tahoe|suburban|impala|explorer|expedition|ranger|altima|sentra|maxima|chevy|chevrolet|ford|toyota|honda|nissan|dodge|ram|gmc|buick|cadillac|chrysler|jeep|mazda|hyundai|kia|volkswagen|audi|bmw|mercedes|truck|car|sedan|suv|pickup|\d{4}/i;
             
-            // Clean up the search query - remove common phrases
-            let searchQuery = lower
-                .replace('do you have', '')
-                .replace('got any', '')
-                .replace('any', '')
-                .replace('looking for', '')
-                .replace('need', '')
-                .replace('want', '')
-                .replace('?', '')
-                .trim();
-            
-            // Replace "chevy" with "chevrolet" in search
-            searchQuery = searchQuery.replace('chevy', 'chevrolet');
-            
-            // Split the query into words
-            const words = searchQuery.split(' ').filter(word => word.length > 0);
-            
-            // Search logic
-            results = inventoryData.filter(vehicle => {
-                const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+            if (vehicleKeywords.test(lower)) {
+                const results = searchVehicles(lower);
                 
-                // Check if ALL words in the search query are in the vehicle string
-                return words.every(word => vehicleString.includes(word));
-            });
-            
-            // If no results with all words, try searching for ANY of the words (looser search)
-            if (results.length === 0 && words.length > 1) {
-                results = inventoryData.filter(vehicle => {
-                    const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+                if (results.length > 0) {
+                    let response = `🚗 <strong>${t.foundVehicles}: ${results.length}</strong><br><br>`;
+                    const showMax = Math.min(10, results.length);
                     
-                    // Check if ANY word in the search query is in the vehicle string
-                    return words.some(word => vehicleString.includes(word));
-                });
-            }
-            
-            // Return results
-            if (results.length > 0) {
-                let response = `🚗 <strong>${t.foundVehicles}: ${results.length}</strong><br><br>`;
-                const showMax = Math.min(10, results.length);
-                
-                for (let i = 0; i < showMax; i++) {
-                    const v = results[i];
-                    response += `<strong>${v.year} ${v.make} ${v.model}</strong><br>`;
-                    response += `📍 ${t.row} ${v.row} | ${t.stock} #${v.stock}<br>`;
-                    response += `🎨 ${t.color}: ${v.color}<br><br>`;
+                    for (let i = 0; i < showMax; i++) {
+                        const v = results[i];
+                        response += `<strong>${v.year} ${v.make} ${v.model}</strong><br>`;
+                        response += `📍 ${t.row} ${v.row} | ${t.stock} #${v.stock}<br>`;
+                        if (v.color) {
+                            response += `🎨 ${t.color}: ${v.color}<br>`;
+                        }
+                        response += `<br>`;
+                    }
+                    
+                    if (results.length > 10) {
+                        response += `<em>...and ${results.length - 10} more!</em><br><br>`;
+                    }
+                    
+                    response += `🔧 ${t.bringTools}`;
+                    return response;
+                } else {
+                    return `${t.noResults}<br><br>` +
+                           `Try searching for something else or check back later - we get new inventory daily!<br><br>` +
+                           `Popular vehicles we often have:<br>` +
+                           `• Honda Accord<br>• Toyota Camry<br>• Ford F150<br>• Chevy Silverado`;
                 }
-                
-                if (results.length > 10) {
-                    response += `<em>...and ${results.length - 10} more!</em><br><br>`;
-                }
-                
-                response += `${t.bringTools}`;
-                return response;
-            } else if (searchQuery.length > 0) {
-                // User was searching for something but no results
-                return `${t.noResults}<br><br>Try searching for something else or check back later - we get new inventory daily!`;
             }
         }
 
@@ -746,7 +810,9 @@
                    `• Engines from $299<br>` +
                    `• Transmissions from $194<br>` +
                    `• Alternators: $37.52<br>` +
-                   `• Starters: $28.91<br><br>` +
+                   `• Starters: $28.91<br>` +
+                   `• Doors: $59.95<br>` +
+                   `• Fenders: $49.95<br><br>` +
                    `All parts come with warranty options!`;
         }
 
@@ -765,7 +831,7 @@
 
         // Default response
         return `I can help you with:<br><br>` +
-               `🚗 Finding specific vehicles (try "Chevy Impala" or "Ford F150")<br>` +
+               `🚗 Finding specific vehicles (try "Honda Accord" or "2015 Ford F150")<br>` +
                `💰 Checking parts prices<br>` +
                `📍 Getting directions to our yard<br>` +
                `🕒 Store hours<br><br>` +
