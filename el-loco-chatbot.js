@@ -1,5 +1,5 @@
 // El Loco Chatbot - Locos Gringos Pick-N-Pull
-// Version 2.0 - Bilingual with Improved Search
+// Version 3.0 - Complete with Fixed Search
 // Website: https://locosgringospicknpull.com
 
 (function() {
@@ -10,7 +10,7 @@
         API_URL: 'https://19457ba2f7ff.ngrok.app/api/live-inventory.txt',
         COMPANY_NAME: 'Locos Gringos Pick-N-Pull',
         BOT_NAME: 'El Loco',
-        BOT_IMAGE: 'https://i.imgur.com/YOUR_IMAGE.png', // UPDATE THIS WITH YOUR IMGUR URL
+        BOT_IMAGE: 'https://imgur.com/ygmELqO.jpg', // UPDATE THIS WITH YOUR IMGUR URL
         PHONE: '903-877-4900',
         ADDRESS: '10310 CR 383, Tyler, TX 75708',
         GATE_FEE: '$2.00',
@@ -664,7 +664,7 @@
                    `📞 ${t.callUs}: <a href="tel:${CONFIG.PHONE}" style="color:#4a8b6b;">${CONFIG.PHONE}</a>`;
         }
         
-        // Show all inventory  
+        // Show all inventory
         if ((lower.includes('inventory') || lower.includes('inventario')) && 
             !lower.includes('chevy') && !lower.includes('chevrolet') && !lower.includes('ford') && !lower.includes('toyota')) {
             if (inventoryData.length > 0) {
@@ -677,212 +677,46 @@
             }
         }
 
-        // IMPROVED VEHICLE SEARCH
+        // FIXED VEHICLE SEARCH
         if (inventoryData.length > 0) {
             let results = [];
             
-            // Brand name mappings (chevy -> chevrolet, etc)
-            const brandMap = {
-                'chevy': 'CHEVROLET',
-                'chevrolet': 'CHEVROLET',
-                'ford': 'FORD',
-                'toyota': 'TOYOTA',
-                'honda': 'HONDA',
-                'nissan': 'NISSAN',
-                'dodge': 'DODGE',
-                'ram': 'RAM',
-                'gmc': 'GMC',
-                'jeep': 'JEEP',
-                'mazda': 'MAZDA',
-                'hyundai': 'HYUNDAI',
-                'kia': 'KIA',
-                'bmw': 'BMW',
-                'mercedes': 'MERCEDES',
-                'audi': 'AUDI',
-                'vw': 'VOLKSWAGEN',
-                'volkswagen': 'VOLKSWAGEN'
-            };
+            // Clean up the search query - remove common phrases
+            let searchQuery = lower
+                .replace('do you have', '')
+                .replace('got any', '')
+                .replace('any', '')
+                .replace('looking for', '')
+                .replace('need', '')
+                .replace('want', '')
+                .replace('?', '')
+                .trim();
             
-            // Model keywords - what people actually type
-            const modelKeywords = {
-                // Chevrolet models
-                'silverado': ['SILVERADO'],
-                'tahoe': ['TAHOE'],
-                'suburban': ['SUBURBAN'],
-                'colorado': ['COLORADO'],
-                'blazer': ['BLAZER', 'TRAILBLAZER'],
-                's10': ['S10', 'S-10'],
-                'camaro': ['CAMARO'],
-                'corvette': ['CORVETTE'],
-                'malibu': ['MALIBU'],
-                'impala': ['IMPALA'],
-                'cruze': ['CRUZE'],
-                'equinox': ['EQUINOX'],
-                'traverse': ['TRAVERSE'],
-                'trax': ['TRAX'],
-                'spark': ['SPARK'],
-                'sonic': ['SONIC'],
-                
-                // Ford models
-                'f150': ['F150', 'F-150'],
-                'f250': ['F250', 'F-250'],
-                'f350': ['F350', 'F-350'],
-                'ranger': ['RANGER'],
-                'explorer': ['EXPLORER'],
-                'expedition': ['EXPEDITION'],
-                'escape': ['ESCAPE'],
-                'edge': ['EDGE'],
-                'mustang': ['MUSTANG'],
-                'fusion': ['FUSION'],
-                'focus': ['FOCUS'],
-                'taurus': ['TAURUS'],
-                
-                // Toyota models
-                'camry': ['CAMRY'],
-                'corolla': ['COROLLA'],
-                'tacoma': ['TACOMA'],
-                'tundra': ['TUNDRA'],
-                'highlander': ['HIGHLANDER'],
-                '4runner': ['4RUNNER', '4 RUNNER'],
-                'rav4': ['RAV4', 'RAV 4'],
-                'sienna': ['SIENNA'],
-                'prius': ['PRIUS'],
-                
-                // Honda models
-                'civic': ['CIVIC'],
-                'accord': ['ACCORD'],
-                'crv': ['CRV', 'CR-V', 'CR V'],
-                'cr-v': ['CRV', 'CR-V', 'CR V'],
-                'pilot': ['PILOT'],
-                'odyssey': ['ODYSSEY'],
-                'ridgeline': ['RIDGELINE'],
-                'fit': ['FIT'],
-                
-                // GMC models
-                'sierra': ['SIERRA'],
-                'canyon': ['CANYON'],
-                'yukon': ['YUKON'],
-                'acadia': ['ACADIA'],
-                'terrain': ['TERRAIN'],
-                
-                // Dodge/Ram models
-                'ram': ['RAM', '1500', '2500', '3500'],
-                '1500': ['1500', 'RAM'],
-                '2500': ['2500', 'RAM'],
-                '3500': ['3500', 'RAM'],
-                'charger': ['CHARGER'],
-                'challenger': ['CHALLENGER'],
-                'durango': ['DURANGO'],
-                'caravan': ['CARAVAN', 'GRAND CARAVAN'],
-                'dakota': ['DAKOTA'],
-                
-                // Jeep models
-                'wrangler': ['WRANGLER'],
-                'cherokee': ['CHEROKEE'],
-                'grand cherokee': ['GRAND CHEROKEE'],
-                'compass': ['COMPASS'],
-                'patriot': ['PATRIOT'],
-                
-                // Nissan models
-                'altima': ['ALTIMA'],
-                'sentra': ['SENTRA'],
-                'maxima': ['MAXIMA'],
-                'versa': ['VERSA'],
-                'rogue': ['ROGUE'],
-                'murano': ['MURANO'],
-                'pathfinder': ['PATHFINDER'],
-                'titan': ['TITAN'],
-                'frontier': ['FRONTIER']
-            };
+            // Replace "chevy" with "chevrolet" in search
+            searchQuery = searchQuery.replace('chevy', 'chevrolet');
             
-            // First, check if user typed a specific model
-            let searchModel = null;
-            let searchBrand = null;
+            // Split the query into words
+            const words = searchQuery.split(' ').filter(word => word.length > 0);
             
-            // Check for model keywords
-            for (let [keyword, models] of Object.entries(modelKeywords)) {
-                if (lower.includes(keyword)) {
-                    searchModel = models;
-                    break;
-                }
-            }
+            // Search logic
+            results = inventoryData.filter(vehicle => {
+                const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+                
+                // Check if ALL words in the search query are in the vehicle string
+                return words.every(word => vehicleString.includes(word));
+            });
             
-            // Check for brand names
-            for (let [keyword, brand] of Object.entries(brandMap)) {
-                if (lower.includes(keyword)) {
-                    searchBrand = brand;
-                    break;
-                }
-            }
-            
-            // SEARCH LOGIC
-            if (searchModel && searchBrand) {
-                // User typed both brand and model (e.g., "chevy tahoe")
-                results = inventoryData.filter(v => {
-                    const vehicleMake = v.make.toUpperCase();
-                    const vehicleModel = v.model.toUpperCase();
-                    return vehicleMake.includes(searchBrand) && 
-                           searchModel.some(model => vehicleModel.includes(model));
+            // If no results with all words, try searching for ANY of the words (looser search)
+            if (results.length === 0 && words.length > 1) {
+                results = inventoryData.filter(vehicle => {
+                    const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+                    
+                    // Check if ANY word in the search query is in the vehicle string
+                    return words.some(word => vehicleString.includes(word));
                 });
-            } else if (searchModel && !searchBrand) {
-                // User typed just model (e.g., "tahoe")
-                results = inventoryData.filter(v => {
-                    const vehicleModel = v.model.toUpperCase();
-                    return searchModel.some(model => vehicleModel.includes(model));
-                });
-            } else if (searchBrand && !searchModel) {
-                // User typed just brand (e.g., "chevy")
-                
-                // Check for type modifiers
-                if (lower.includes('truck') || lower.includes('pickup')) {
-                    const truckModels = ['SILVERADO', 'COLORADO', 'S10', 'S-10', 'AVALANCHE', 
-                                        'F150', 'F250', 'F350', 'RANGER', 
-                                        'RAM', '1500', '2500', '3500', 'DAKOTA',
-                                        'TACOMA', 'TUNDRA', 'TITAN', 'FRONTIER',
-                                        'SIERRA', 'CANYON', 'RIDGELINE'];
-                    results = inventoryData.filter(v => 
-                        v.make.toUpperCase().includes(searchBrand) &&
-                        truckModels.some(model => v.model.toUpperCase().includes(model))
-                    );
-                } else if (lower.includes('suv')) {
-                    const suvModels = ['TAHOE', 'SUBURBAN', 'BLAZER', 'TRAILBLAZER', 'EQUINOX', 'TRAVERSE',
-                                      'EXPLORER', 'EXPEDITION', 'ESCAPE', 'EDGE', 
-                                      'HIGHLANDER', '4RUNNER', 'RAV4', 
-                                      'CRV', 'CR-V', 'PILOT', 
-                                      'YUKON', 'ACADIA', 'TERRAIN',
-                                      'DURANGO', 'JOURNEY',
-                                      'WRANGLER', 'CHEROKEE', 'GRAND CHEROKEE', 'COMPASS',
-                                      'ROGUE', 'MURANO', 'PATHFINDER'];
-                    results = inventoryData.filter(v => 
-                        v.make.toUpperCase().includes(searchBrand) &&
-                        suvModels.some(model => v.model.toUpperCase().includes(model))
-                    );
-                } else {
-                    // Just show all vehicles from that brand
-                    results = inventoryData.filter(v => 
-                        v.make.toUpperCase().includes(searchBrand)
-                    );
-                }
-            } else {
-                // Check for generic terms
-                if (lower.includes('truck') || lower.includes('pickup')) {
-                    const truckModels = ['SILVERADO', 'COLORADO', 'S10', 'F150', 'F250', 'F350', 'RANGER', 
-                                        'RAM', '1500', '2500', '3500', 'TACOMA', 'TUNDRA', 'SIERRA', 'CANYON', 
-                                        'TITAN', 'FRONTIER', 'RIDGELINE', 'DAKOTA'];
-                    results = inventoryData.filter(v => 
-                        truckModels.some(model => v.model.toUpperCase().includes(model))
-                    );
-                } else if (lower.includes('suv')) {
-                    const suvModels = ['TAHOE', 'SUBURBAN', 'EXPLORER', 'EXPEDITION', 'HIGHLANDER', '4RUNNER', 
-                                      'CRV', 'CR-V', 'RAV4', 'PILOT', 'YUKON', 'DURANGO', 'CHEROKEE', 
-                                      'WRANGLER', 'PATHFINDER', 'ROGUE', 'MURANO'];
-                    results = inventoryData.filter(v => 
-                        suvModels.some(model => v.model.toUpperCase().includes(model))
-                    );
-                }
             }
             
-            // Return results if found
+            // Return results
             if (results.length > 0) {
                 let response = `🚗 <strong>${t.foundVehicles}: ${results.length}</strong><br><br>`;
                 const showMax = Math.min(10, results.length);
@@ -900,8 +734,8 @@
                 
                 response += `${t.bringTools}`;
                 return response;
-            } else if (searchModel || searchBrand) {
-                // No results found but user was searching for something
+            } else if (searchQuery.length > 0) {
+                // User was searching for something but no results
                 return `${t.noResults}<br><br>Try searching for something else or check back later - we get new inventory daily!`;
             }
         }
@@ -916,18 +750,22 @@
                    `All parts come with warranty options!`;
         }
 
-        // Fun responses
+        // Greetings
         if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey') || lower.includes('hola')) {
-            return `Hey there! Welcome to Locos Gringos! What can I help you find today?`;
+            return `Hey there! Welcome to Locos Gringos! What can I help you find today? 🚗`;
         }
 
         if (lower.includes('thank') || lower.includes('gracias')) {
-            return `You're welcome! Come visit us anytime - the gate's only $2 and the parts are waiting!`;
+            return `You're welcome! Come visit us anytime - the gate's only $2 and the parts are waiting! 🎉`;
+        }
+
+        if (lower.includes('how are you')) {
+            return `Doing great! Just here helping folks find the parts they need. What can I help you with?`;
         }
 
         // Default response
         return `I can help you with:<br><br>` +
-               `🚗 Finding specific vehicles (try "Chevy Tahoe" or "Ford trucks")<br>` +
+               `🚗 Finding specific vehicles (try "Chevy Impala" or "Ford F150")<br>` +
                `💰 Checking parts prices<br>` +
                `📍 Getting directions to our yard<br>` +
                `🕒 Store hours<br><br>` +
