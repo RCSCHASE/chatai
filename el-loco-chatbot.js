@@ -46,12 +46,19 @@
         BOT_IMAGE: 'https://imgur.com/ygmELqO.jpg',
         PHONE: '903-877-4900',
         ADDRESS: '10310 CR 383, Tyler, TX 75708',
-        GATE_FEE: '$3.00', // Updated based on price list
+        GATE_FEE: '$2.00', // Updated based on price list
         WEBSITE: 'https://locosgringospicknpull.com',
         PARTS_LIST_URL: 'https://www.locosgringospicknpull.com/parts-list',
         INVENTORY_SEARCH_URL: 'https://www.locosgringospicknpull.com/search-inventory',
         VEHICLES_FOR_SALE_URL: 'https://www.locosgringospicknpull.com/vehicles-for-sale',
         SELL_CAR_URL: 'https://www.locosgringospicknpull.com/sell-my-car-1',
+        HOURS_URL: 'https://www.locosgringospicknpull.com/info',
+        VIP_REWARDS_TEXT_PROGRAM_URL: 'https://www.locosgringospicknpull.com/text-alerts-new-arrivals',
+        NEW_ARRIVALS_URL: 'https://www.locosgringospicknpull.com/new-arrivals',
+        UPCOMING_SALES_URL: 'https://www.locosgringospicknpull.com/loco-upcoming-sales-dates-info',
+        CONTACT_URL: 'https://www.locosgringospicknpull.com/contact', 
+        WORK_AT_LOCOS_URL: 'https://www.locosgringospicknpull.com/jobs',
+        
         HOURS: {
             en: {
                 'Monday-Friday': '8:00 AM - 4:30 PM',
@@ -1485,3 +1492,4 @@
 
 </body>
 </html>
+
