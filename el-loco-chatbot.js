@@ -11,7 +11,7 @@
         SHEETS_URL: 'https://docs.google.com/spreadsheets/d/1esnMH3l5Wasc3RHOnSLjv8OkEhuX5OyXdWnEC9Eao7k/export?format=csv&gid=19085212',
         COMPANY_NAME: 'Locos Gringos Pick-N-Pull',
         BOT_NAME: 'El Loco',
-        BOT_IMAGE: 'https://imgur.com/ygmELqO.jpg', // UPDATE THIS WITH YOUR IMGUR URL
+        BOT_IMAGE: 'https://i.imgur.com/YOUR_IMAGE.png', // UPDATE THIS WITH YOUR IMGUR URL
         PHONE: '903-877-4900',
         ADDRESS: '10310 CR 383, Tyler, TX 75708',
         GATE_FEE: '$2.00',
@@ -542,17 +542,23 @@
 
     function showWelcomeMessage() {
         const t = TRANSLATIONS[currentLanguage];
-        const welcomeMsg = `
-            ${t.welcome}<br><br>
+        const welcomeMessages = [
+            `${t.welcome}<br><br>
             ${t.tagline}<br><br>
-            ${t.helpWith}<br>
-            ${t.findVehicles}<br>
-            ${t.checkPrices}<br>
-            ${t.getDirections}<br>
-            ${t.storeInfo}<br><br>
-            ${t.whatHelp}
-        `;
-        addMessage(welcomeMsg, 'bot');
+            I'm here to help you find parts, chat about cars, or honestly whatever's on your mind!<br><br>
+            What's going on? Need a part? Got a broken ride? Just bored? I'm here for all of it! 🚗`,
+            
+            `Yo! ${CONFIG.BOT_NAME} here! 🤖<br><br>
+            Welcome to the best junkyard in East Texas! We got more parts than you can shake a wrench at!<br><br>
+            What brings you by today? Looking for something specific or just browsing?`,
+            
+            `Hey there! ${CONFIG.BOT_NAME} at your service!<br><br>
+            ${t.tagline}<br><br>
+            Whether you need a transmission, an alternator, or just wanna chat about that project car - I'm your guy! What's up?`
+        ];
+        
+        const randomWelcome = welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)];
+        addMessage(randomWelcome, 'bot');
     }
 
     function updateQuickActions() {
@@ -665,8 +671,8 @@
                    `📞 ${t.callUs}: <a href="tel:${CONFIG.PHONE}" style="color:#4a8b6b;">${CONFIG.PHONE}</a>`;
         }
         
-        // Inventory
-        if (lower.includes('inventory') || lower.includes('inventario') || lower.includes('vehicle') || lower.includes('vehículo')) {
+        // Show all inventory
+        if ((lower.includes('inventory') || lower.includes('inventario')) && !lower.includes('ford') && !lower.includes('chevy') && !lower.includes('toyota')) {
             if (inventoryData.length > 0) {
                 return `🚗 <strong>${inventoryData.length} ${t.vehiclesInYard}!</strong><br><br>` +
                        `${currentLanguage === 'es' ? 'Búsquedas populares' : 'Popular searches'}:<br>` +
@@ -677,41 +683,288 @@
             }
         }
 
-        // Vehicle search
-        const carBrands = ['ford', 'chevy', 'chevrolet', 'toyota', 'honda', 'nissan', 'dodge', 'ram', 'gmc', 'jeep'];
-        const foundBrand = carBrands.find(brand => lower.includes(brand));
-        
-        if (foundBrand && inventoryData.length > 0) {
-            const results = inventoryData.filter(v => 
-                v.make.toLowerCase().includes(foundBrand) || 
-                v.model.toLowerCase().includes(lower)
-            ).slice(0, 5);
-
-            if (results.length === 0) {
-                return t.noResults;
+        // Smart vehicle search with slang support
+        if (inventoryData.length > 0) {
+            let results = [];
+            
+            // Common slang and model mappings
+            const slangMap = {
+                'chevy truck': ['silverado', 'colorado', 's10', 'c1500', 'k1500', 'c2500', 'k2500'],
+                'ford truck': ['f150', 'f250', 'f350', 'ranger'],
+                'toyota truck': ['tacoma', 'tundra'],
+                'gmc truck': ['sierra', 'canyon'],
+                'dodge truck': ['ram', '1500', '2500', '3500'],
+                'chevy car': ['camaro', 'malibu', 'impala', 'cruze', 'corvette'],
+                'ford car': ['mustang', 'fusion', 'focus', 'taurus'],
+                'honda car': ['civic', 'accord', 'crv', 'cr-v', 'pilot']
+            };
+            
+            // Check for specific models first
+            const specificModels = ['silverado', 'f150', 'f-150', 'f250', 'f-250', 'f350', 'f-350', 
+                                   'camry', 'corolla', 'civic', 'accord', 'mustang', 'camaro', 
+                                   'tahoe', 'suburban', 'explorer', 'expedition', 'focus', 
+                                   'fusion', 'malibu', 'impala', 'cruze', 'altima', 'sentra',
+                                   'tacoma', 'tundra', 'ranger', 'colorado', 'canyon', 'sierra',
+                                   'ram', '1500', '2500', '3500', 'charger', 'challenger',
+                                   'wrangler', 'cherokee', 'grand cherokee', 'compass'];
+            
+            // Check if user is asking for a specific model
+            let searchingForModel = null;
+            for (let model of specificModels) {
+                if (lower.includes(model)) {
+                    searchingForModel = model;
+                    break;
+                }
             }
-
-            let response = `🚗 <strong>${t.foundVehicles}: ${results.length}</strong><br><br>`;
-            results.forEach(v => {
-                response += `<strong>${v.year} ${v.make} ${v.model}</strong><br>`;
-                response += `📍 ${t.row} ${v.row} | ${t.stock} #${v.stock}<br>`;
-                response += `🎨 ${t.color}: ${v.color}<br><br>`;
-            });
-            return response;
+            
+            // Check for slang terms
+            let slangModels = [];
+            for (let [slang, models] of Object.entries(slangMap)) {
+                if (lower.includes(slang)) {
+                    slangModels = models;
+                    break;
+                }
+            }
+            
+            // Search logic
+            if (searchingForModel) {
+                // User asked for specific model - only show that model
+                results = inventoryData.filter(v => {
+                    const vehicleModel = v.model.toLowerCase();
+                    const normalizedSearch = searchingForModel.replace('-', '');
+                    const normalizedModel = vehicleModel.replace('-', '');
+                    return normalizedModel.includes(normalizedSearch) || 
+                           vehicleModel === searchingForModel;
+                });
+            } else if (slangModels.length > 0) {
+                // User used slang - show matching models
+                results = inventoryData.filter(v => {
+                    const vehicleModel = v.model.toLowerCase();
+                    return slangModels.some(model => vehicleModel.includes(model));
+                });
+            } else {
+                // Check for brand mentions with smart filtering
+                const brands = {
+                    'chevy': 'CHEVROLET',
+                    'chevrolet': 'CHEVROLET',
+                    'ford': 'FORD',
+                    'toyota': 'TOYOTA',
+                    'honda': 'HONDA',
+                    'nissan': 'NISSAN',
+                    'dodge': 'DODGE',
+                    'ram': 'RAM',
+                    'gmc': 'GMC',
+                    'jeep': 'JEEP',
+                    'mazda': 'MAZDA',
+                    'hyundai': 'HYUNDAI',
+                    'kia': 'KIA',
+                    'bmw': 'BMW',
+                    'mercedes': 'MERCEDES',
+                    'audi': 'AUDI',
+                    'vw': 'VOLKSWAGEN',
+                    'volkswagen': 'VOLKSWAGEN'
+                };
+                
+                let foundBrand = null;
+                for (let [key, value] of Object.entries(brands)) {
+                    if (lower.includes(key)) {
+                        foundBrand = value;
+                        break;
+                    }
+                }
+                
+                if (foundBrand) {
+                    // Check if user mentioned "truck" or "car" with the brand
+                    if (lower.includes('truck') || lower.includes('pickup')) {
+                        // Filter for trucks only
+                        const truckModels = ['SILVERADO', 'F150', 'F250', 'F350', 'RAM', 'SIERRA', 
+                                            'TACOMA', 'TUNDRA', 'RANGER', 'COLORADO', 'CANYON', 
+                                            'FRONTIER', 'TITAN', 'RIDGELINE'];
+                        results = inventoryData.filter(v => 
+                            v.make.toUpperCase().includes(foundBrand) &&
+                            truckModels.some(model => v.model.toUpperCase().includes(model))
+                        );
+                    } else if (lower.includes('car') || lower.includes('sedan')) {
+                        // Filter for cars only (exclude common truck/SUV models)
+                        const truckSuvModels = ['SILVERADO', 'F150', 'F250', 'F350', 'RAM', 'SIERRA',
+                                               'TACOMA', 'TUNDRA', 'RANGER', 'COLORADO', 'CANYON',
+                                               'TAHOE', 'SUBURBAN', 'YUKON', 'EXPLORER', 'EXPEDITION',
+                                               'PILOT', 'CRV', 'CR-V', 'RAV4', 'HIGHLANDER', '4RUNNER'];
+                        results = inventoryData.filter(v => 
+                            v.make.toUpperCase().includes(foundBrand) &&
+                            !truckSuvModels.some(model => v.model.toUpperCase().includes(model))
+                        );
+                    } else if (lower.includes('suv')) {
+                        // Filter for SUVs only
+                        const suvModels = ['TAHOE', 'SUBURBAN', 'YUKON', 'EXPLORER', 'EXPEDITION',
+                                          'PILOT', 'CRV', 'CR-V', 'RAV4', 'HIGHLANDER', '4RUNNER',
+                                          'CHEROKEE', 'WRANGLER', 'DURANGO', 'TRAVERSE', 'EQUINOX',
+                                          'ESCAPE', 'EDGE', 'PATHFINDER', 'MURANO', 'ROGUE'];
+                        results = inventoryData.filter(v => 
+                            v.make.toUpperCase().includes(foundBrand) &&
+                            suvModels.some(model => v.model.toUpperCase().includes(model))
+                        );
+                    } else {
+                        // Show all vehicles from that brand
+                        results = inventoryData.filter(v => 
+                            v.make.toUpperCase().includes(foundBrand)
+                        );
+                    }
+                }
+            }
+            
+            // Return results if found
+            if (results.length > 0) {
+                let response = `🚗 <strong>${t.foundVehicles}: ${results.length}</strong><br><br>`;
+                const showMax = Math.min(10, results.length);
+                
+                for (let i = 0; i < showMax; i++) {
+                    const v = results[i];
+                    response += `<strong>${v.year} ${v.make} ${v.model}</strong><br>`;
+                    response += `📍 ${t.row} ${v.row} | ${t.stock} #${v.stock}<br>`;
+                    response += `🎨 ${t.color}: ${v.color}<br><br>`;
+                }
+                
+                if (results.length > 10) {
+                    response += `<em>...and ${results.length - 10} more!</em><br><br>`;
+                }
+                
+                response += `Visit us to pull the parts you need!`;
+                return response;
+            }
         }
 
-        // Parts prices
+        // Parts prices with personality
         if (lower.includes('price') || lower.includes('precio') || lower.includes('part') || lower.includes('parte')) {
-            return `💰 <strong>${t.popularParts}:</strong><br><br>` +
-                   `• ${currentLanguage === 'es' ? 'Motores' : 'Engines'}: $299+<br>` +
-                   `• ${currentLanguage === 'es' ? 'Transmisiones' : 'Transmissions'}: $194+<br>` +
-                   `• ${currentLanguage === 'es' ? 'Alternadores' : 'Alternators'}: $37.52<br>` +
-                   `• ${currentLanguage === 'es' ? 'Arrancadores' : 'Starters'}: $28.91<br><br>` +
-                   `✅ ${t.warranty}!`;
+            const priceResponses = [
+                `💰 <strong>Oh you want the good stuff? Check these deals out:</strong><br><br>` +
+                `• Engines from $299 (Yeah, complete engines!)<br>` +
+                `• Transmissions from $194 (No more grinding gears!)<br>` +
+                `• Alternators: $37.52 (Keep that battery charged!)<br>` +
+                `• Starters: $28.91 (Vroom vroom time!)<br><br>` +
+                `Plus we got warranties on everything! Come on down!`,
+                
+                `💰 <strong>Let me hook you up with our prices amigo:</strong><br><br>` +
+                `Engines? Got 'em from $299<br>` +
+                `Transmissions? $194 and up<br>` +
+                `Need an alternator? Only $37.52<br>` +
+                `Starter giving you trouble? $28.91<br><br>` +
+                `And hey, everything comes with warranty options! Can't beat that!`
+            ];
+            return priceResponses[Math.floor(Math.random() * priceResponses.length)];
         }
 
-        // Default
-        return `${t.helpWith}<br>• ${t.findVehicles}<br>• ${t.checkPrices}<br>• ${t.storeInfo}`;
+        // Fun responses for random topics
+        if (lower.includes('weather') || lower.includes('hot') || lower.includes('cold')) {
+            const weatherResponses = [
+                "Man, it's Texas - it's either blazing hot or randomly freezing! 🌡️ Good thing our yard's open rain or shine! Bring water in summer though, trust me on that one.",
+                "Weather? In East Texas? Ha! If you don't like it, wait 5 minutes! 😄 But hey, perfect weather for pulling parts is any day ending in 'y'!",
+                "It's hotter than a $2 pistol out here! But that just means less crowds at the yard. Smart shoppers come early or late!"
+            ];
+            return weatherResponses[Math.floor(Math.random() * weatherResponses.length)];
+        }
+
+        if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey') || lower.includes('hola')) {
+            const greetings = [
+                "Hey there! What's up? Looking for some sweet car parts or just saying hi? Either way, I'm here! 👋",
+                "¡Órale! Welcome to Locos Gringos! What brings you by today?",
+                "Yo! El Loco here! Ready to find you the best deals in East Texas! What you need?",
+                "Well hello there, friend! Pull up a chair and tell me what kind of ride you're working on!"
+            ];
+            return greetings[Math.floor(Math.random() * greetings.length)];
+        }
+
+        if (lower.includes('thank') || lower.includes('gracias')) {
+            const thanks = [
+                "No problem at all! That's what I'm here for! Need anything else?",
+                "You got it, amigo! Happy to help! 🤝",
+                "Anytime! Hey, tell your friends about us - we got the best prices in East Texas!",
+                "De nada! Come visit us soon - bring your tools!"
+            ];
+            return thanks[Math.floor(Math.random() * thanks.length)];
+        }
+
+        if (lower.includes('joke') || lower.includes('funny')) {
+            const jokes = [
+                "Why don't cars ever get tired? Because they come with spare tires! 😄 Speaking of spares, we got plenty!",
+                "What do you call a Ford Fiesta that ran out of gas? A Ford Siesta! 😴 Good thing we got fuel pumps for $23!",
+                "My mechanic told me 'I couldn't fix your brakes, so I made your horn louder!' That's why I work here now! 😂",
+                "What's the difference between a BMW and a porcupine? The porcupine has pricks on the outside! 😏 We got parts for both though!"
+            ];
+            return jokes[Math.floor(Math.random() * jokes.length)];
+        }
+
+        if (lower.includes('food') || lower.includes('hungry') || lower.includes('eat')) {
+            return "Oh man, I feel you! There's a great taco truck that parks near us on weekends! 🌮 But first, let me help you find those car parts. Gotta work before we eat, right?";
+        }
+
+        if (lower.includes('sports') || lower.includes('cowboys') || lower.includes('football')) {
+            return "How 'bout them Cowboys?! 🏈 You know what's more reliable than the Cowboys' playoff chances? Our inventory! We got what you need, guaranteed!";
+        }
+
+        if (lower.includes('expensive') || lower.includes('cheap') || lower.includes('money')) {
+            return "Look, I get it - times are tough! That's exactly why we're here! Our prices are the lowest in East Texas, and you pull the parts yourself to save even more. It's like a treasure hunt where you always win! 💰";
+        }
+
+        if (lower.includes('help') && !lower.includes('what')) {
+            return "Of course I'll help! That's literally my job and I love it! Tell me what you're working on - what year, make, and model? Or are you just browsing? I'm here for whatever you need!";
+        }
+
+        if (lower.includes('how are you') || lower.includes('how you doing')) {
+            const howAreYou = [
+                "Living the dream, baby! Surrounded by car parts and helping folks like you save money! Can't complain! How about you?",
+                "Better than a new alternator on a dead battery! What can I do for you today?",
+                "I'm doing great! Just helped someone find a transmission for their F-150. Love making people's day! What are you working on?"
+            ];
+            return howAreYou[Math.floor(Math.random() * howAreYou.length)];
+        }
+
+        if (lower.includes('broken') || lower.includes('fix') || lower.includes('repair')) {
+            return "Broken car? Been there! That's why we're here - whatever's busted, we probably got the part. Tell me what's wrong and let's get you back on the road! 🔧";
+        }
+
+        if (lower.includes('best') || lower.includes('recommend')) {
+            return "Best? Everything here is the best deal you'll find! But seriously, tell me what you're driving and what's wrong with it. I'll point you in the right direction!";
+        }
+
+        if (lower.includes('covid') || lower.includes('mask')) {
+            return "We're open regular hours! It's an outdoor yard so plenty of fresh air. Now, what parts can I help you find today?";
+        }
+
+        if (lower.includes('gas') || lower.includes('fuel')) {
+            const gas = [
+                "Gas prices got you down? Good news - our fuel pumps start at just $23! Fix that gas guzzler or find a more efficient engine!",
+                "Yeah, these gas prices are LOCO! Maybe time to swap in a more efficient engine? We got options!"
+            ];
+            return gas[Math.floor(Math.random() * gas.length)];
+        }
+
+        if (lower.includes('tesla') || lower.includes('electric')) {
+            return "Ha! Electric cars? Not many of those in our yard yet! We're old school - real engines, real parts, real savings! But hey, we got regular car parts that'll keep your gas guzzler running!";
+        }
+
+        if (lower.includes('beer') || lower.includes('drink')) {
+            return "Whoa there partner! Save the cold ones for after you're done pulling parts! 🍺 Safety first! But hey, what parts you looking for?";
+        }
+
+        if (lower.includes('girlfriend') || lower.includes('boyfriend') || lower.includes('date')) {
+            return "Haha! Can't help you there, but I can help you fix your ride! Nothing impresses a date like a car that actually starts! 😉";
+        }
+
+        if (lower.includes('stupid') || lower.includes('dumb') || lower.includes('hate')) {
+            return "Hey now, no negativity in the yard! We're all about good vibes and great prices here! How about we find you some awesome parts instead?";
+        }
+
+        // Default responses with more personality
+        const defaults = [
+            "Hmm, not sure what you're asking about there, but I can definitely help you find car parts! What kind of vehicle you got?",
+            "You know what? Let's talk cars! What are you driving and what parts do you need?",
+            "Interesting question! But hey, while you're here - need any parts? We got tons of inventory!",
+            "I might be El Loco, but I'm loco about car parts! 😄 What can I help you find today?",
+            "That's a new one! But seriously, let me know if you need help finding any parts. That's what I'm really good at!"
+        ];
+        
+        return defaults[Math.floor(Math.random() * defaults.length)];
     }
 
     function addMessage(content, sender) {
