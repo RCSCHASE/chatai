@@ -1,5 +1,5 @@
 // El Loco Chatbot - Locos Gringos Pick-N-Pull
-// Version 3.1 - Fixed Vehicle Search Logic
+// Version 3.2 - Improved Vehicle Search Logic
 // Website: https://locosgringospicknpull.com
 
 (function() {
@@ -640,19 +640,22 @@
         }, 1000);
     }
 
+    // === START: NEW AND IMPROVED FUNCTION ===
     function searchVehicles(searchQuery) {
         if (!searchQuery || inventoryData.length === 0) return [];
-        
-        // Clean and normalize the search query
-        searchQuery = searchQuery.toLowerCase()
+
+        // 1. Clean and normalize the search query
+        const cleanedQuery = searchQuery.toLowerCase()
             .replace(/do you have any|do you have|got any|any|looking for|need|want|\?/g, '')
             .replace(/chevy/g, 'chevrolet')
             .trim();
-        
-        // Extract key search terms
-        const searchTerms = searchQuery.split(/\s+/).filter(term => term.length > 0);
-        
-        // Create search patterns for common variations
+
+        // If the query is empty after cleaning (e.g., just "do you have any"), stop here.
+        if (!cleanedQuery) return [];
+
+        const initialSearchTerms = cleanedQuery.split(/\s+/).filter(term => term.length > 0);
+
+        // 2. Define make/model patterns for enhancement
         const makeModelPatterns = {
             'accord': ['honda', 'accord'],
             'accords': ['honda', 'accord'],
@@ -662,8 +665,8 @@
             'camrys': ['toyota', 'camry'],
             'corolla': ['toyota', 'corolla'],
             'corollas': ['toyota', 'corolla'],
-            'f150': ['ford', 'f-150', 'f150'],
-            'f-150': ['ford', 'f-150', 'f150'],
+            'f150': ['ford', 'f150'],
+            'f-150': ['ford', 'f150'],
             'silverado': ['chevrolet', 'silverado'],
             'silverados': ['chevrolet', 'silverado'],
             'impala': ['chevrolet', 'impala'],
@@ -685,50 +688,48 @@
             'maxima': ['nissan', 'maxima'],
             'maximas': ['nissan', 'maxima']
         };
-        
-        // Check if search query matches a known model pattern
-        let enhancedSearchTerms = [...searchTerms];
-        for (const term of searchTerms) {
+
+        // 3. Enhance search terms using patterns without deleting original terms (like year)
+        const enhancedTerms = new Set(initialSearchTerms);
+        initialSearchTerms.forEach(term => {
             if (makeModelPatterns[term]) {
-                // Add the make to search terms if model is mentioned alone
-                enhancedSearchTerms = makeModelPatterns[term];
-                break;
+                // Add the associated make/model from our patterns
+                makeModelPatterns[term].forEach(t => enhancedTerms.add(t));
+                // If the original term was plural (e.g., "accords"), remove it in favor of the singular "accord"
+                if (term.endsWith('s') && term.length > 1) {
+                    enhancedTerms.delete(term);
+                }
             }
-        }
-        
-        // Perform the search
-        let results = inventoryData.filter(vehicle => {
-            const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
-            
-            // For known make/model patterns, check if vehicle matches
-            if (enhancedSearchTerms !== searchTerms) {
-                return enhancedSearchTerms.every(term => 
-                    vehicleString.includes(term) || 
-                    (term === 'f-150' && vehicleString.includes('f150')) ||
-                    (term === 'f150' && vehicleString.includes('f-150'))
-                );
-            }
-            
-            // Otherwise, check if all search terms are in the vehicle string
-            return enhancedSearchTerms.every(term => vehicleString.includes(term));
         });
-        
-        // If no exact matches, try partial matches (but only if we have meaningful search terms)
-        if (results.length === 0 && searchTerms.length > 0) {
-            // Try searching for just the make or model
+        const finalSearchTerms = Array.from(enhancedTerms);
+
+        // 4. Perform the primary search using all enhanced terms
+        let results = inventoryData.filter(vehicle => {
+            // Create a robust, searchable string for each vehicle. This now handles "F-150" vs "F150" automatically.
+            const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+            const vehicleStringNoDash = vehicleString.replace(/-/g, '');
+
+            // Check if EVERY search term is present in the vehicle string
+            return finalSearchTerms.every(term => {
+                const termNoDash = term.replace(/-/g, '');
+                return vehicleString.includes(term) || vehicleStringNoDash.includes(termNoDash);
+            });
+        });
+
+        // 5. If no exact matches, try a more lenient partial match with the ORIGINAL search terms
+        if (results.length === 0 && initialSearchTerms.length > 0) {
             results = inventoryData.filter(vehicle => {
                 const vehicleString = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.toLowerCase();
+                const matchCount = initialSearchTerms.filter(term => vehicleString.includes(term)).length;
                 
-                // Count how many search terms match
-                const matchCount = searchTerms.filter(term => vehicleString.includes(term)).length;
-                
-                // Return vehicles that match at least half of the search terms (minimum 1)
-                return matchCount > 0 && matchCount >= Math.ceil(searchTerms.length / 2);
+                // Match if at least half the original terms are present
+                return matchCount > 0 && matchCount >= Math.ceil(initialSearchTerms.length / 2);
             });
         }
-        
+
         return results;
     }
+    // === END: NEW AND IMPROVED FUNCTION ===
 
     function processMessage(msg) {
         const lower = msg.toLowerCase();
